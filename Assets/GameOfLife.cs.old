@@ -1,0 +1,419 @@
+﻿using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using System.Linq;
+using Newtonsoft.Json;
+
+public class GameOfLife : MonoBehaviour {
+
+	//1. starta med att (initsetup) randomiserar ut ett värde för alla B. Av 48 knappar bör ca 20 få färg så oddsen bör vara 28/48 svart, 20/48 vit. av vit bör ca 2/5(8/48) bli färgade (random).
+	//2. överför B:s value till en statisk array (InitValue).
+	//3. räkna ut lösningen - randomisera antalet generationer, uppdatera displayen. Räkna ut lösningen och lagra den i array (SubmitValue).
+	//4. uppdatera meshes via en metod.
+	//5. aktivera modulen.
+
+	//B.oninteract: byt value (F->B->W->B->W...). uppdatera mesh.
+	//Submit.oninteract: kolla BtnValue[alla] mot SolveValue[alla] - vid olika, strike och return. vid lika, pass.
+	//Reset.oninteract: överför InitValue till BtnValue. kör metod för uppdatera meshes.
+
+	public KMBombInfo Info;
+	public KMBombModule Module;
+	public KMAudio Audio;
+
+	public KMSelectable[] Btn;
+	public KMSelectable Submit;
+	public KMSelectable Reset;
+	public MeshRenderer[] BtnColor;
+	public TextMesh DisplayText;
+
+	private int[] BtnValue = new int[48];
+	private int[] BtnValueStore = new int[48];
+	private int[] InitValue = new int[48];
+	private int[] SubmitValue = new int[48];
+	private int[] nCount = new int[48];
+	private int Gen;
+
+	// these variables can be altered
+	private int WhiteCount = 12;		// how many white squares there will be, at average, in the setup
+	private int GenRange = 4;			// maximum number of generations
+	private float SuspendTime = 0.8f;	// time between tix when submit is pressed
+	private float SneakTime = 0.4f;		// time the solution is showed when a strike occurs
+
+	string iiSerial;
+	int iiLast;
+	int iiFirst;
+	int iiSum;
+	int iiStrikes;
+	int iiBatteries;
+	int iiBatteryHolders;
+	int iiLit;
+	int iiUnlit;
+	int iiPorts;
+	int iiPortTypes;
+	int iiModules;
+	int iiSolved;
+	int iiRs;
+
+	private bool isActive = false;
+	private bool isSolved = false;
+	private bool isSubmitting = false;
+
+	private static int moduleIdCounter = 1;
+	private int moduleId = 0;
+
+
+	// Loading screen
+	void Start () {
+
+		moduleId = moduleIdCounter++;
+		Module.OnActivate += Activate;
+	}
+
+
+	// Lights off
+	void Awake () {
+
+		InitSetup ();
+
+		Reset.OnInteract += delegate () {
+			Audio.PlayGameSoundAtTransform (KMSoundOverride.SoundEffect.ButtonPress, Reset.transform);
+			Reset.AddInteractionPunch ();
+			handleReset ();
+			return false;
+		};
+
+		Submit.OnInteract += delegate () {
+			//handleSubmit ();
+			if (!isActive || isSolved || isSubmitting) {
+
+			} else {
+			StartCoroutine(handleSubmit());
+			}
+			return false;
+		};
+
+
+
+		for (int i = 0; i < 48; i++)
+		{
+			int j = i;
+			Btn[i].OnInteract += delegate () {
+				handleSquare (j);
+				return false;
+			};
+		}
+	}
+
+
+	// Lights on
+	void Activate () {
+
+		isActive = true;
+		iiSerial = Info.GetSerialNumber ();
+		//iiLast = Info.GetSerialNumberNumbers ().Last ();
+		//iiFirst = Info.GetSerialNumberNumbers ().First ();
+		//iiSum = Info.GetSerialNumberNumbers ().Sum ();
+		//iiBatteries = Info.GetBatteryCount ();
+		//iiBatteryHolders = Info.GetBatteryHolderCount ();
+		//iiLit = Info.GetOnIndicators ().Count ();
+		//iiUnlit = Info.GetOffIndicators ().Count ();
+		//iiPorts = Info.GetPortCount ();
+		//iiPortTypes = Info.GetPorts ().Distinct ().Count ();
+		//iiModules = Info.GetModuleNames ().Count ();
+		//string indc = String.Join ("", Info.GetIndicators ().ToArray ());
+		//iiRs = (indc.Count ("R".Contains));
+
+	}
+
+
+	// Initial setup
+	void InitSetup () {
+
+		Gen = Random.Range (2, (GenRange + 1));
+		DisplayText.text = Gen.ToString ();
+
+		for (int i = 0; i < 48; i++)
+		{
+			// radomizing starting squares
+			int j = i;
+			BtnValue [i] = Random.Range (0, 48);
+			if (BtnValue [i] < (42 - WhiteCount + Gen)) { //a higher gen count makes less white squares = easier
+				InitValue [j] = 0;
+				BtnValue [j] = 0;
+				//BtnColor [j].material.color = Color.black;
+			} else { 
+				if (BtnValue [i] < 42) {
+					InitValue [j] = 1;
+					BtnValue [j] = 1;
+					//BtnColor [j].material.color = Color.white;
+				} else {
+					if (BtnValue [i] == 42) {
+						InitValue [j] = 2;
+						BtnValue [j] = 2;
+						//BtnColor [j].material.color = Color.red;
+					} else {
+						if (BtnValue [i] == 43) {
+							InitValue [j] = 3;
+							BtnValue [j] = 3;
+							//BtnColor [j].material.color = Color.green;
+						} else {
+							if (BtnValue [i] == 44) {
+								InitValue [j] = 4;
+								BtnValue [j] = 4;
+								//BtnColor [j].material.color = Color.blue;
+							} else {
+								if (BtnValue [i] == 45) {
+									InitValue [j] = 5;
+									BtnValue [j] = 5;
+									//BtnColor [j].material.color = Color.yellow;
+								} else {
+									if (BtnValue [i] == 46) {
+										InitValue [j] = 6;
+										BtnValue [j] = 6;
+										//BtnColor [j].material.color = Color.magenta;
+									} else {
+										//if (BtnValue [i] = 47) {
+										InitValue [j] = 7;
+										BtnValue [j] = 7;
+										//BtnColor [j].material.color = Color.cyan;
+										//}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		updateSquares ();
+	}
+
+
+	// Update the squares to correct colors
+	void updateSquares () {
+		
+		for (int i = 0; i < 48; i++)
+		{
+			int j = i;
+			if (BtnValue [i] == 0) {
+				BtnColor [j].material.color = Color.black;
+			} else { 
+				if (BtnValue [i] == 1) {
+					BtnColor [j].material.color = Color.white;
+				} else { 
+					if (BtnValue [i] == 2) {
+						BtnColor [j].material.color = Color.red;
+					} else {
+						if (BtnValue [i] == 3) {
+							BtnColor [j].material.color = Color.green;
+						} else {
+							if (BtnValue [i] == 4) {
+								BtnColor [j].material.color = Color.blue;
+							} else {
+								if (BtnValue [i] == 5) {
+									BtnColor [j].material.color = Color.yellow;
+								} else {
+									if (BtnValue [i] == 6) {
+										BtnColor [j].material.color = Color.magenta;
+									} else {
+//										if (BtnValue [i] = 47) {
+										BtnColor [j].material.color = Color.cyan;
+//										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+
+
+	// Submit is pressed, calculate solution and compare to BtnValue
+	//void handleSubmit () {
+	private IEnumerator handleSubmit() {
+		
+		Audio.PlayGameSoundAtTransform (KMSoundOverride.SoundEffect.ButtonPress, Submit.transform);
+		Submit.AddInteractionPunch ();
+
+			isSubmitting = true;
+			//store the present values in SubmitValue
+			for (int i = 0; i < 48; i++) {
+				SubmitValue [i] = BtnValue [i];
+			}
+			//run a reset
+			for (int i = 0; i < 48; i++) {
+				BtnValue [i] = InitValue [i];
+				updateSquares ();
+			}
+			//transform colored squares to black/white
+			for (int i = 0; i < 48; i++) {
+				int j = i;
+				if (BtnValue [i] > 1) {
+				if (BtnValue [i] == 2) { //red
+					BtnValue [j] = 0;
+				}
+				if (BtnValue [i] == 3) { //green
+					BtnValue [j] = 0;
+				}
+				if (BtnValue [i] == 4) { //blue
+					BtnValue [j] = 0;
+				}
+				if (BtnValue [i] == 5) { //yellow
+					BtnValue [j] = 0;
+				}
+				if (BtnValue [i] == 6) { //magenta
+					BtnValue [j] = 0;
+				}
+				if (BtnValue [i] == 7) { //cyan
+					BtnValue [j] = 0;
+				}
+				}
+			}
+			//do the generations, present visually
+			for (int i = 0; i < Gen; i++) {
+				//apply rules here
+				//for every generation:
+				//store btnvalues
+				for (int j = 0; j < 48; j++) {
+					BtnValueStore [j] = BtnValue [j];
+				}
+				//process neighbors and set new value
+				for (int k = 0; k < 48; k++) {
+					int l = k;
+					nCount [l] = 0;
+					//top left
+					if (k - 7 < 0) {
+					} else {
+						if (BtnValueStore[(k - 7)] == 1){
+							nCount [l]++;
+						}
+					}
+					//top
+					if (k - 6 < 0) {
+					} else {
+						if (BtnValueStore[(k - 6)] == 1){
+							nCount [l]++;
+						}
+					}
+					//top right
+					if (k - 5 < 0) {
+					} else {
+						if (BtnValueStore[(k - 5)] == 1){
+							nCount [l]++;
+						}
+					}
+					//left
+					if (k - 1 < 0) {
+					} else {
+						if (BtnValueStore[(k - 1)] == 1){
+							nCount [l]++;
+						}
+					}
+					//right
+					if (k + 1 > 47) {
+					} else {
+						if (BtnValueStore[(k + 1)] == 1){
+							nCount [l]++;
+						}
+					}
+					//bottom left
+					if (k + 5 > 47) {
+					} else {
+						if (BtnValueStore[(k + 5)] == 1){
+							nCount [l]++;
+						}
+					}
+					//bottom
+					if (k + 6 > 47) {
+					} else {
+						if (BtnValueStore[(k + 6)] == 1){
+							nCount [l]++;
+						}
+					}
+					//bottom right
+					if (k + 7 > 47) {
+					} else {
+						if (BtnValueStore[(k + 7)] == 1){
+							nCount [l]++;
+						}
+					}
+					//read nCount and decide result
+					//if square is white
+					if (BtnValue [k] == 1) {
+						if (nCount [k] < 2 || nCount [k] > 3) {
+							BtnValue [k] = 0; 
+						}
+					} else {
+						//if square is black
+						if (nCount [k] == 3) {
+							BtnValue [k] = 1; 
+						}
+					}
+				}
+				//values updated, display result then wait
+				updateSquares ();
+				if (i < (Gen - 1)) {
+					yield return new WaitForSeconds (SuspendTime);
+				}
+				//returns to process next generation
+			}
+			//test last generation against SubmitValue
+		for (int i = 0; i < 48; i++) {
+			if (isSubmitting == true){
+			//is any square wrongly submitted, then strike
+				if (BtnValue [i] != SubmitValue [i]) {
+					Debug.Log ("[Game of Life #" + moduleId + "] Submit pressed. First error found at square number " + (i + 1) + " in reading order");
+					Module.HandleStrike ();
+					yield return new WaitForSeconds (SneakTime);
+					isSubmitting = false;
+					handleReset ();
+				}
+			}
+		}
+		//solve!
+		if (isSubmitting == true) {
+			Debug.Log ("[Game of Life #" + moduleId + "] Submit pressed. No errors found! Module passed");
+			Module.HandlePass ();
+			isSolved = true;
+		}
+	}
+
+
+	// Reset is pressed, reset Btns to initial state
+	void handleReset () {
+
+		if (!isActive || isSolved || isSubmitting)
+			return;
+		else {
+			for (int i = 0; i < 48; i++) {
+				BtnValue [i] = InitValue [i];
+				updateSquares ();
+			}
+		}
+	}
+
+
+	// Square[num] is pressed, toggle colors
+	void handleSquare (int num) {
+
+		Audio.PlayGameSoundAtTransform (KMSoundOverride.SoundEffect.ButtonPress, Btn[num].transform);
+
+		if (!isActive || isSolved || isSubmitting)
+			return;
+		else {
+			if (BtnValue [num] > 0) {
+				BtnValue [num] = 0;
+				BtnColor [num].material.color = Color.black;
+			} else {
+				if (BtnValue [num] == 0) {
+					BtnValue [num] = 1;
+					BtnColor [num].material.color = Color.white;
+				}
+			}
+		}
+	}
+}
