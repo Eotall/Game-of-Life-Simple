@@ -6911,7 +6911,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ModuleType: GameOfLifeSimple
-  ModuleDisplayName: Simple Game Of Life
+  ModuleDisplayName: Game of Life Simple
   RequiresTimerVisibility: 0
 --- !u!114 &114000010749779026
 MonoBehaviour:

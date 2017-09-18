@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Name: ModConfig
   m_EditorClassIdentifier: 
   id: GameOfLifeSimple
-  title: 'Simple Game Of Life '
-  version: 1.0s
+  title: Game of Life Simple
+  version: 1.2s
   outputFolder: build
