@@ -1,9 +1,11 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Linq;
 using Newtonsoft.Json;
+using Random = UnityEngine.Random;
 
 public class GameOfLife : MonoBehaviour {
 
@@ -441,4 +443,34 @@ public class GameOfLife : MonoBehaviour {
 
 			yield return false;
 	}
+
+    private string TwitchHelpMessage = "Set the cells with !{0} a1 a2 b2 c3 f6... Submit the current state with !{0} submit. Reset to initial state with !{0} reset";
+    KMSelectable[] ProcessTwitchCommand(string inputCommand)
+    {
+        List<KMSelectable> buttons = new List<KMSelectable>();
+        string[] split = inputCommand.ToLowerInvariant().Split(' ');
+        if (split.Length == 1 && split[0] == "reset")
+        {
+            buttons.Add(Reset);
+        }
+        else if (split.Length == 1 && split[0] == "submit")
+        {
+            buttons.Add(Submit);
+        }
+        else
+        {
+            const string letters = "abcdef";
+            const string numbers = "12345678";
+            foreach (string item in split)
+            {
+                int x = letters.IndexOf(item.Substring(0, 1), StringComparison.Ordinal);
+                int y = numbers.IndexOf(item.Substring(1, 1), StringComparison.Ordinal);
+                if (item.Length != 2 || x < 0 || y < 0)
+                    return null;
+                buttons.Add(Btn[(y*6)+x]);
+            }
+        }
+        return buttons.Count > 0 ? buttons.ToArray() : null;
+    }
+
 }
